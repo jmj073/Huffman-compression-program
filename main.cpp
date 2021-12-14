@@ -8,11 +8,9 @@
 
 #define ENTER_HELP "Enter '-h' as argument for help.\n"
 
-#define INVALID_ARG "Invalid argument received.\n" \
-					ENTER_HELP
+#define INVALID_ARG "Invalid argument received.\n" ENTER_HELP
 
-#define INVALID_OPTION_COMBINATION "Invalid option combination,\n" \
-								ENTER_HELP
+#define INVALID_OPTION_COMBINATION "Invalid option combination,\n" ENTER_HELP
 
 #define SAME_PATH "Source and destination cannot be the same."
 
