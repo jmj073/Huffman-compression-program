@@ -38,7 +38,7 @@ HufNode* MakePrefixTree(const vector<uint32_t>& token_table)
 {
 	priority_queue<HufNode*, vector<HufNode*>, ptr_greater<HufNode>> token_queue;
 
-	// Å¥ Ã¤¿ì±â
+	// í ì±„ìš°ê¸°
 	for (int i = 0; i < TOKEN_SIZE; i++) {
 		if (token_table[i] > 0) {
 			TokenCount token_cnt{ i, token_table[i] };
@@ -48,7 +48,7 @@ HufNode* MakePrefixTree(const vector<uint32_t>& token_table)
 
 	if (token_queue.empty()) return nullptr;
 
-	// Æ®¸® ±¸¼º
+	// íŠ¸ë¦¬ êµ¬ì„±
 	while (token_queue.size() > 1) {
 		HufNode* newNode = new HufNode{};
 
@@ -79,7 +79,7 @@ vector<Code> MakeCodeTable(HufNode* tree)
 
 static void BuildCodeTable(HufNode* node, int size, bool code[], vector<Code>& code_table)
 {
-	// Æ®¸®ÀÇ ÀÚ½ÄÀÇ °³¼ö´Â 2°³ÀÌ°Å³ª 0°³ÀÌ¹Ç·Î ¾çÂÊ ´Ù °Ë»çÇÒ ÇÊ¿ä ¾øÀ½
+	// íŠ¸ë¦¬ì˜ ìì‹ì˜ ê°œìˆ˜ëŠ” 2ê°œì´ê±°ë‚˜ 0ê°œì´ë¯€ë¡œ ì–‘ìª½ ë‹¤ ê²€ì‚¬í•  í•„ìš” ì—†ìŒ
 	if (node->link(LEFT)) {
 		code[size] = LEFT;
 		BuildCodeTable(node->link(LEFT), size + 1, code, code_table);
@@ -103,7 +103,7 @@ record_size_t BuildTokenRecords(HufNode* node, TokenRecord token_records[])
 	record_size_t num_of_records = 0;
 
 	node_stack.push(node);
-	level_stack.push(0); // ·¹º§Àº 0ºÎÅÍ ½ÃÀÛÇÔ.
+	level_stack.push(0); // ë ˆë²¨ì€ 0ë¶€í„° ì‹œì‘í•¨.
 
 	while (!node_stack.empty()) {
 		node = node_stack.top();
@@ -129,18 +129,18 @@ record_size_t BuildTokenRecords(HufNode* node, TokenRecord token_records[])
 
 void Encode(istream& is, ostream& os, const vector<Code>& code_table, HufNode* tree)
 {
-	// ÅäÅ« ¸®ÄÚµå ºôµå
+	// í† í° ë¦¬ì½”ë“œ ë¹Œë“œ
 	TokenRecord token_records[TOKEN_SIZE];
 	record_size_t records_size = BuildTokenRecords(tree, token_records);
 
-	// ¸¶Áö¸·¿¡ ¾²±âÀ§ÇÑ Çì´õ °ø°£ È®º¸
+	// ë§ˆì§€ë§‰ì— ì“°ê¸°ìœ„í•œ í—¤ë” ê³µê°„ í™•ë³´
 	Header header{ 0, records_size };
 	os.write((char*)&header, sizeof(Header));
 
-	// Æ®¸® ÀúÀå
+	// íŠ¸ë¦¬ ì €ì¥
 	os.write((char*)token_records, sizeof(TokenRecord) * records_size);
 
-	// ¸ŞÀÎ µ¥ÀÌÅÍ ¾²±â
+	// ë©”ì¸ ë°ì´í„° ì“°ê¸°
 	token_size_t character = 0;
 	int current_bit = 0;
 
@@ -157,7 +157,7 @@ void Encode(istream& is, ostream& os, const vector<Code>& code_table, HufNode* t
 	if (current_bit) {
 		os.put(character);
 		os.seekp(0);
-		header.remain_bits = current_bit;
+		header.padding_bits = current_bit;
 		os.write((char*)&header, sizeof(Header));
 	}
 }
@@ -212,7 +212,7 @@ void Decode(std::istream& is, std::ostream& os)
 			else {
 				os.put(node->get().token);
 				node = tree.get();
-				if (is.peek() == EOF && i >= header.remain_bits)
+				if (is.peek() == EOF && i >= header.padding_bits)
 					break;
 			}
 		}
@@ -221,16 +221,16 @@ void Decode(std::istream& is, std::ostream& os)
 
 void Encoding(istream& is, ostream& os)
 {
-	// ÅäÅ« Å×ÀÌºí
+	// í† í° í…Œì´ë¸”
 	vector<uint32_t> token_table = MakeTokenTable(is);
 
-	// Æ®¸®
+	// íŠ¸ë¦¬
 	PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
 
-	//ÄÚµå Å×ÀÌºí
+	//ì½”ë“œ í…Œì´ë¸”
 	vector<Code> code_table = MakeCodeTable(tree.get());
 
-	// ÆÄÀÏ¿¡ Ãâ·Â
+	// íŒŒì¼ì— ì¶œë ¥
 	is.clear();
 	is.seekg(0);
 	Encode(is, os, code_table, tree.get());
