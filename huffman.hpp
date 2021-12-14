@@ -50,7 +50,7 @@ using record_size_t = uint16_t;
 struct Header
 {
 	//uint8_t file_name_len;
-	uint8_t remain_bits;
+	uint8_t padding_bits;
 	record_size_t records_size;
 };
 
