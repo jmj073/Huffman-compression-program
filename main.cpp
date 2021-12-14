@@ -63,7 +63,7 @@ void PrintSize(const char* src, const char* dst)
 	}
 	else {
 		cout << "increase: " << destination_size - source_size << "bytes, ";
-		cout << (1 - (double)source_size / destination_size) * 100 << '%';
+		cout << (double)destination_size / source_size - 1 * 100 << '%';
 	}
 	cout << endl;
 }
