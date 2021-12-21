@@ -15,7 +15,7 @@
   >     + token: 8-bit code
   > + **data**: compressed data
 
-??????
+??????   
 C:\Users\user\Desktop>Huffman.exe -e -s qthttpserver
 source: 678002bytes, destination: 558922bytes, decrease: 119080bytes, 17.5634%
 
