@@ -85,7 +85,7 @@ public:
 	}
 
 	PODNodeGuard& operator=(const PODNodeGuard&) = delete;
-	PODNodeGuard& operator=(PODNodeGuard&& other) {
+	PODNodeGuard& operator=(PODNodeGuard&& other) noexcept {
 		DestroyPODNodes(node);
 		node = other.node;
 		other.node = nullptr;
