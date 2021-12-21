@@ -92,7 +92,7 @@ vector<Code> MakeCodeTable(const HufNode* tree)
 	bool code[TOKEN_SIZE];
 	vector<Code> code_table(TOKEN_SIZE);
 
-	BuildCodeTable(tree, 0, code, code_table);
+	if (tree) BuildCodeTable(tree, 0, code, code_table);
 
 	return code_table;
 }
@@ -240,8 +240,8 @@ void Encoding(istream& is, ostream& os)
 	// 트리
 	PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
 
-	if (!tree)
-		throw exception{ "Cannot build Huffman tree" };
+	/*if (!tree)
+		throw exception{ "Cannot build Huffman tree" };*/
 
 	//코드 테이블
 	vector<Code> code_table = MakeCodeTable(tree.get());
@@ -319,6 +319,7 @@ void Compress(const fs::path& path, ostream& os)
 
 void ConvertToToken(std::istream& is, std::ostream& os, const HufNode* tree, int padding_bits, size_t max_len)
 {
+	if (!tree) return;
 	const HufNode* node = tree;
 
 	token_t bits = 0;
@@ -355,9 +356,9 @@ void Decode(istream& is, ostream& os)
 	is.read((char*)token_records, sizeof(TokenRecord) * header.records_size);
 	PODNodeGuard<HufNode> tree{ DecodeTokenRecords(token_records, header.records_size) };
 
-	if (!tree)
+	if (!tree && header.records_size)
 		throw exception{ "Invalid file header: Invalid token records: Huffman tree build faild" };
-
+	
 	ConvertToToken(is, os, tree.get(), header.padding_bits, header.data_size);
 }
 

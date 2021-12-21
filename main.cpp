@@ -75,6 +75,7 @@ try {
 		}
 
 		Huffman::Compress(argv[i], os);
+		flush(os);
 	}
 	else if (options & DECODE) {
 		if (argc == i) {
