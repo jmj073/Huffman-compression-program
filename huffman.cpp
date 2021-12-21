@@ -2,6 +2,9 @@
 
 #include <queue>
 #include <stack>
+#include <fstream>
+#include <memory>
+#include <cstring>
 
 #define LEFT 0
 #define RIGHT 1
@@ -9,6 +12,8 @@
 #define NEXT 1
 
 using namespace std;
+namespace fs = std::filesystem;
+
 
 template <typename T>
 struct ptr_greater
@@ -22,23 +27,39 @@ struct ptr_greater
 namespace Huffman
 {
 
-static void BuildCodeTable(HufNode* tree, int size, bool code[], vector<Code>& code_table);
-
-vector<uint32_t> MakeTokenTable(istream& is)
+size_t WritePath(ostream& os, const NameType* str)
 {
-	vector<uint32_t> token_table(TOKEN_SIZE);
+	auto cur = str;
+	while (*cur) cur++;
+	os.write((char*)str, (cur - str) * sizeof(NameType));
+	return (cur - str);
+}
 
+static void BuildCodeTable(const HufNode* tree, int size, bool code[], vector<Code>& code_table);
+inline void FillTokenTable(istream& is, vector<size_t>& token_table);
+
+// preprocessing for encoding-----------------------------------------------
+inline void FillTokenTable(istream& is, vector<size_t>& token_table)
+{
 	while (is.peek() != EOF)
-		token_table[(token_size_t)is.get()]++;
+		token_table[(token_t)is.get()]++;
+}
+
+vector<size_t> MakeTokenTable(istream& is)
+{
+	vector<size_t> token_table(TOKEN_SIZE);
+
+	FillTokenTable(is, token_table);
 
 	return token_table;
 }
 
-HufNode* MakePrefixTree(const vector<uint32_t>& token_table)
+// ∏ﬁ∏∏Æ ¥©ºˆ ∞Ì∑¡ æ¯¿Ω
+HufNode* MakePrefixTree(const vector<size_t>& token_table)
 {
 	priority_queue<HufNode*, vector<HufNode*>, ptr_greater<HufNode>> token_queue;
 
-	// ÌÅê Ï±ÑÏö∞Í∏∞
+	// ≈• √§øÏ±‚
 	for (int i = 0; i < TOKEN_SIZE; i++) {
 		if (token_table[i] > 0) {
 			TokenCount token_cnt{ i, token_table[i] };
@@ -48,14 +69,14 @@ HufNode* MakePrefixTree(const vector<uint32_t>& token_table)
 
 	if (token_queue.empty()) return nullptr;
 
-	// Ìä∏Î¶¨ Íµ¨ÏÑ±
+	// ∆Æ∏Æ ±∏º∫
 	while (token_queue.size() > 1) {
-		HufNode* newNode = new HufNode{};
-
 		HufNode* left = token_queue.top();
 		token_queue.pop();
 		HufNode* right = token_queue.top();
 		token_queue.pop();
+
+		HufNode* newNode = new HufNode{};
 
 		newNode->get().count = left->get().count + right->get().count;
 		newNode->set_link(LEFT, left);
@@ -63,23 +84,22 @@ HufNode* MakePrefixTree(const vector<uint32_t>& token_table)
 
 		token_queue.push(newNode);
 	}
-	
 	return token_queue.top();
 }
 
-vector<Code> MakeCodeTable(HufNode* tree)
+vector<Code> MakeCodeTable(const HufNode* tree)
 {
 	bool code[TOKEN_SIZE];
 	vector<Code> code_table(TOKEN_SIZE);
 
-	if (tree) BuildCodeTable(tree, 0, code, code_table);
+	BuildCodeTable(tree, 0, code, code_table);
 
 	return code_table;
 }
 
-static void BuildCodeTable(HufNode* node, int size, bool code[], vector<Code>& code_table)
+static void BuildCodeTable(const HufNode* node, int size, bool code[], vector<Code>& code_table)
 {
-	// Ìä∏Î¶¨Ïùò ÏûêÏãùÏùò Í∞úÏàòÎäî 2Í∞úÏù¥Í±∞ÎÇò 0Í∞úÏù¥ÎØÄÎ°ú ÏñëÏ™Ω Îã§ Í≤ÄÏÇ¨Ìï† ÌïÑÏöî ÏóÜÏùå
+	// ∆Æ∏Æ¿« ¿⁄Ωƒ¿« ∞≥ºˆ¥¬ 2∞≥¿Ã∞≈≥™ 0∞≥¿Ãπ«∑Œ æÁ¬  ¥Ÿ ∞ÀªÁ«“ « ø‰ æ¯¿Ω
 	if (node->link(LEFT)) {
 		code[size] = LEFT;
 		BuildCodeTable(node->link(LEFT), size + 1, code, code_table);
@@ -94,21 +114,21 @@ static void BuildCodeTable(HufNode* node, int size, bool code[], vector<Code>& c
 	}
 }
 
-record_size_t BuildTokenRecords(HufNode* node, TokenRecord token_records[])
+uint16_t BuildTokenRecords(const HufNode* node, TokenRecord token_records[])
 {
 	if (!node) return 0;
 
-	stack<HufNode*> node_stack;
-	stack<token_size_t> level_stack;
-	record_size_t num_of_records = 0;
+	stack<const HufNode*> node_stack;
+	stack<token_t> level_stack;
+	uint16_t num_of_records = 0;
 
 	node_stack.push(node);
-	level_stack.push(0); // Î†àÎ≤®ÏùÄ 0Î∂ÄÌÑ∞ ÏãúÏûëÌï®.
+	level_stack.push(0); // ∑π∫ß¿∫ 0∫Œ≈Õ Ω√¿€«‘.
 
 	while (!node_stack.empty()) {
 		node = node_stack.top();
 		node_stack.pop();
-		token_size_t level = level_stack.top();
+		token_t level = level_stack.top();
 		level_stack.pop();
 
 		if (node->link(LEFT)) {
@@ -127,51 +147,15 @@ record_size_t BuildTokenRecords(HufNode* node, TokenRecord token_records[])
 	return num_of_records;
 }
 
-void Encode(istream& is, ostream& os, const vector<Code>& code_table, HufNode* tree)
+// ∏ﬁ∏∏Æ ¥©ºˆ ∞Ì∑¡ æ¯¿Ω
+HufNode* DecodeTokenRecords(const TokenRecord token_records[], uint16_t records_size)
 {
-	// ÌÜ†ÌÅ∞ Î¶¨ÏΩîÎìú ÎπåÎìú
-	TokenRecord token_records[TOKEN_SIZE];
-	record_size_t records_size = BuildTokenRecords(tree, token_records);
-
-	// ÎßàÏßÄÎßâÏóê Ïì∞Í∏∞ÏúÑÌïú Ìó§Îçî Í≥µÍ∞Ñ ÌôïÎ≥¥
-	Header header{ 0, records_size };
-	os.write((char*)&header, sizeof(Header));
-
-	// Ìä∏Î¶¨ Ï†ÄÏû•
-	os.write((char*)token_records, sizeof(TokenRecord) * records_size);
-
-	// Î©îÏù∏ Îç∞Ïù¥ÌÑ∞ Ïì∞Í∏∞
-	token_size_t character = 0;
-	int current_bit = 0;
-
-	while (is.peek() != EOF) {
-		token_size_t idx = is.get();
-		for (bool flag : code_table[idx]) {
-			character |= flag << current_bit;
-			if (++current_bit == 8) {
-				os.put(character);
-				current_bit = character = 0;
-			}
-		}
-	}
-	if (current_bit) {
-		os.put(character);
-		os.seekp(0);
-		header.padding_bits = current_bit;
-		os.write((char*)&header, sizeof(Header));
-	}
-}
-
-HufNode* DecodeTokenRecords(TokenRecord token_records[], record_size_t records_size)
-{
-	if (!records_size) return nullptr;
-
 	stack<HufNode*> tree_stack;
 
-	for (record_size_t i = 0; i < records_size; i++) {
+	for (uint16_t i = 0; i < records_size; i++) {
 		HufNode* new_node = new HufNode{ token_records[i].token,
 										 token_records[i].level };
-		while (!tree_stack.empty() && 
+		while (!tree_stack.empty() &&
 				tree_stack.top()->get().count == new_node->get().count) {
 			HufNode* left = tree_stack.top();
 			tree_stack.pop();
@@ -185,62 +169,266 @@ HufNode* DecodeTokenRecords(TokenRecord token_records[], record_size_t records_s
 		tree_stack.push(new_node);
 	}
 
-	return tree_stack.top();
+	if (tree_stack.size() == 1)
+		return tree_stack.top();
+	else {
+		while (!tree_stack.empty()) {
+			DestroyPODNodes(tree_stack.top());
+			tree_stack.pop();
+		}
+		return nullptr;
+	}
 }
 
-void Decode(std::istream& is, std::ostream& os)
+// encoding process-------------------------------------------------------------
+
+int ConvertToHufCode(istream& is, ostream& os, const vector<Code>& code_table)
 {
-	Header header{};
+	token_t character = 0;
+	int current_bit = 0;
+
+	while (is.peek() != EOF) {
+		token_t idx = is.get();
+		for (bool flag : code_table[idx]) {
+			character |= flag << current_bit;
+			if (++current_bit == TOKEN_BITS) {
+				os.put(character);
+				current_bit = character = 0;
+			}
+		}
+	}
+
+	if (current_bit)
+		os.put(character);
+
+	return (TOKEN_BITS - current_bit) % TOKEN_BITS;
+}
+
+void Encode(istream& is, ostream& os, const vector<Code>& code_table, const HufNode* tree)
+{
+	// ≈‰≈´ ∏Æƒ⁄µÂ ∫ÙµÂ
+	TokenRecord token_records[TOKEN_SIZE];
+	uint16_t records_size = BuildTokenRecords(tree, token_records);
+
+	// ∏∂¡ˆ∏∑ø° æ≤±‚¿ß«— «Ï¥ı ∞¯∞£ »Æ∫∏
+	HufHeader header{ 0, records_size };
+	auto header_pos = os.tellp();
+	os.write((char*)&header, sizeof(HufHeader));
+	
+	// ∆Æ∏Æ ¿˙¿Â
+	os.write((char*)token_records, sizeof(TokenRecord) * records_size);
+
+	// «„«¡∏∏ ƒ⁄µÂ∑Œ ∫Ø»Ø
+	auto temp_os_pos = os.tellp();
+	header.padding_bits = ConvertToHufCode(is, os, code_table);
+
+	auto last_pos = os.tellp();
+	header.data_size = last_pos - temp_os_pos;
+
+	os.seekp(header_pos);
+	os.write((char*)&header, sizeof(HufHeader));
+	os.seekp(last_pos);
+}
+
+void Encoding(istream& is, ostream& os)
+{
+	auto first_pos = is.tellg();
+
+	// ≈‰≈´ ≈◊¿Ã∫Ì
+	vector<size_t> token_table = MakeTokenTable(is);
+
+	// ∆Æ∏Æ
+	PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
+
+	if (!tree)
+		throw exception{ "Cannot build Huffman tree" };
+
+	//ƒ⁄µÂ ≈◊¿Ã∫Ì
+	vector<Code> code_table = MakeCodeTable(tree.get());
+
+	// ∆ƒ¿œø° √‚∑¬
+	is.clear();
+	is.seekg(first_pos);
+	Encode(is, os, code_table, tree.get());
+}
+
+void EncodeFile(const fs::path& file_path, ostream& os)
+{
+	ifstream is{ file_path, ios_base::binary };
+	if (!is.good()) {
+		auto ec = make_error_code(huf_errc::invalid_fstream);
+		throw fs::filesystem_error{ "EncodeFile", file_path, ec };
+	}
+
+	FileHeader header{ TYPE_REGULAR_FILE };
+	auto header_pos = os.tellp();
+	os.write((char*)&header, sizeof(FileHeader));
+
+	header.name_size = WritePath(os, file_path.filename().c_str());
+
+	if (header.name_size >= FILENAME_MAX)
+		throw out_of_range{ "Invalid file name length: " + to_string(header.name_size) };
+
+	Encoding(is, os);
+
+	auto current_pos = os.tellp();
+	os.seekp(header_pos);
+	os.write((char*)&header, sizeof(FileHeader));
+	os.seekp(current_pos);
+}
+
+void EncodeDirectory(const fs::path& dir_path, ostream& os)
+{
+	auto directory_iter = fs::directory_iterator(dir_path);
+
+	DirectoryHeader header{ TYPE_DIRECTORY };
+	auto header_pos = os.tellp();
+	os.write((char*)&header, sizeof(DirectoryHeader));
+
+	header.name_size = WritePath(os, dir_path.filename().c_str());
+
+	if (header.name_size >= FILENAME_MAX)
+		throw out_of_range{ "Invalid file name length: " + to_string(header.name_size) };
+
+	for (const auto& path : directory_iter) {
+		Compress(path, os);
+		header.data_size++;
+	}
+
+	auto current_pos = os.tellp();
+	os.seekp(header_pos);
+	os.write((char*)&header, sizeof(DirectoryHeader));
+	os.seekp(current_pos);
+}
+
+void Compress(const fs::path& path, ostream& os)
+{
+	if (fs::is_directory(path)) {
+		EncodeDirectory(path, os);
+	}
+	else if (fs::is_regular_file(path)) {
+		EncodeFile(path, os);
+	}
+	else {
+		error_code ec = make_error_code(huf_errc::invalid_file_type);
+		throw fs::filesystem_error{ "Compress", path, ec };
+	}
+}
+
+// decoding process-------------------------------------------------------------
+
+void ConvertToToken(std::istream& is, std::ostream& os, const HufNode* tree, int padding_bits, size_t max_len)
+{
+	const HufNode* node = tree;
+
+	token_t bits = 0;
+	while (is.peek() != EOF && max_len--) {
+		bits = is.get();
+
+		for (uint8_t i = 0; i < TOKEN_BITS;) {
+			if (node->link(bits & RIGHT)) {
+				node = node->link(bits & RIGHT);
+				bits >>= 1;
+				i++;
+			}
+			else {
+				os.put(node->get().token);
+				node = tree;
+				if (is.peek() == EOF && (i + padding_bits) >= TOKEN_BITS)
+					break;
+			}
+		}
+	}
+	if (!node->link(bits & RIGHT))
+		os.put(node->get().token);
+}
+
+void Decode(istream& is, ostream& os)
+{
+	HufHeader header{};
 	is.read((char*)&header, sizeof(Header));
+
+	if (header.records_size > TOKEN_SIZE)
+		throw out_of_range{ "Invalid file header: Invalid token records size: " + to_string(header.records_size) };
 
 	TokenRecord token_records[TOKEN_SIZE];
 	is.read((char*)token_records, sizeof(TokenRecord) * header.records_size);
 	PODNodeGuard<HufNode> tree{ DecodeTokenRecords(token_records, header.records_size) };
 
-	if (!tree) return;
+	if (!tree)
+		throw exception{ "Invalid file header: Invalid token records: Huffman tree build faild" };
 
-	HufNode* node = tree.get();
-
-	while (is.peek() != EOF) {
-		token_size_t bits = is.get();
-
-		for (uint8_t i = 0; i < 8;) {
-			if (node->link(bits & RIGHT)) {
-				node = node->link(bits & RIGHT);
-				bits >>= 1; i++;
-			}
-			else {
-				os.put(node->get().token);
-				node = tree.get();
-				if (is.peek() == EOF && i >= header.padding_bits)
-					break;
-			}
-		}
-	}
-}
-
-void Encoding(istream& is, ostream& os)
-{
-	// ÌÜ†ÌÅ∞ ÌÖåÏù¥Î∏î
-	vector<uint32_t> token_table = MakeTokenTable(is);
-
-	// Ìä∏Î¶¨
-	PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
-
-	//ÏΩîÎìú ÌÖåÏù¥Î∏î
-	vector<Code> code_table = MakeCodeTable(tree.get());
-
-	// ÌååÏùºÏóê Ï∂úÎ†•
-	is.clear();
-	is.seekg(0);
-	Encode(is, os, code_table, tree.get());
-	flush(os);
+	ConvertToToken(is, os, tree.get(), header.padding_bits, header.data_size);
 }
 
 void Decoding(istream& is, ostream& os)
 {
 	Decode(is, os);
-	flush(os);
+}
+
+void DecodeFile(istream& is, const fs::path& file_path)
+{
+	ofstream os{ file_path, ios_base::binary };
+
+	if (!os.good()) {
+		error_code ec = make_error_code(huf_errc::invalid_fstream);
+		throw fs::filesystem_error{ "DecodeFile", file_path, ec };
+	}
+	
+	Decoding(is, os);
+}
+
+void DecodeDirectory(istream& is, const fs::path& prefix, size_t num_of_file)
+{
+	fs::create_directory(prefix);
+
+	for (size_t i = 0; i < num_of_file; i++)
+		Decompress(is, prefix);
+}
+
+void Decompress(istream& is, const fs::path& prefix)
+{
+	Header header{};
+	is.read((char*)&header, sizeof(Header));
+
+	if (header.name_size >= FILENAME_MAX || !header.name_size)
+		throw out_of_range{ "Invalid file header: Invalid file name size: " + to_string(header.name_size) };
+
+	NameType name[FILENAME_MAX];
+	is.read((char*)name, sizeof(NameType) * header.name_size);
+	name[header.name_size] = 0;
+
+	switch (header.type) {
+	case TYPE_REGULAR_FILE:
+		DecodeFile(is, prefix / name);
+		break;
+	case TYPE_DIRECTORY:
+		DecodeDirectory(is, prefix / name, header.data_size);
+		break;
+	}
+}
+
+fs::path DecompressRetFilename(istream& is, const fs::path& prefix)
+{
+	Header header{};
+	is.read((char*)&header, sizeof(Header));
+
+	if (header.name_size >= FILENAME_MAX || !header.name_size)
+		throw out_of_range{ "Invalid file header: Invalid file name size: " + to_string(header.name_size) };
+
+	NameType name[FILENAME_MAX];
+	is.read((char*)name, sizeof(NameType) * header.name_size);
+	name[header.name_size] = 0;
+
+	switch (header.type) {
+	case TYPE_REGULAR_FILE:
+		DecodeFile(is, prefix / name);
+		break;
+	case TYPE_DIRECTORY:
+		DecodeDirectory(is, prefix / name, header.data_size);
+		break;
+	}
+	return name;
 }
 
 }
