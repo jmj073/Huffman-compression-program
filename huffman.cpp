@@ -393,7 +393,7 @@ void Decompress(istream& is, const fs::path& prefix)
 	is.read((char*)&header, sizeof(Header));
 
 	if (header.name_size >= FILENAME_MAX || !header.name_size)
-		throw out_of_range{ "Invalid file header: Invalid file name size: " + to_string(header.name_size) };
+		throw out_of_range{ "Invalid file header: Invalid file name length: " + to_string(header.name_size) };
 
 	NameType name[FILENAME_MAX];
 	is.read((char*)name, sizeof(NameType) * header.name_size);

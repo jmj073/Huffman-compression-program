@@ -9,7 +9,8 @@
 #define ENTER_HELP "Enter '-h' as argument for help.\n"
 #define INVALID_ARG "Invalid argument received.\n" ENTER_HELP
 #define INVALID_OPTION_COMBINATION "Invalid option combination,\n" ENTER_HELP
-#define SAME_PATH "Source and destination cannot be the same."
+#define SAME_PATH "Source and destination cannot be the same.\n"
+#define FILE_IS_EMPTY "File is empty.\n"
 
 // Exit Code
 
@@ -19,6 +20,7 @@
 #define EC_UNABLE_TO_OPEN_FILE -3
 #define EC_INVALID_OPTION_COMBINATION -4
 #define EC_SAME_PATH -5
+#define EC_EMPTY_FILE -6
 
 // Options
 #define ENCODE			01
@@ -88,6 +90,10 @@ try {
 			auto ec = make_error_code(huf_errc::invalid_fstream);
 			throw fs::filesystem_error{ "main", argv[i], ec };
 		}
+		else if (is.peek() == EOF) {
+			cerr << FILE_IS_EMPTY;
+			return EC_EMPTY_FILE;
+		}
 
 		dst_path = (argc - i == 2) ? argv[i + 1] : fs::path(argv[i]).parent_path();
 
@@ -127,7 +133,7 @@ catch (...) {
 void PrintHelp()
 {
 	cout << "usage: app_name [options] source [destination]\n"
-			"ex) huffman -e -s -del source.txt destination.huf\n"
+			"ex) huffman -e -s -r source.txt destination.huf\n"
 			"  options:\n"
 			"    All options are compared by first letter only\n"
 			"    -h  (help) print help. No source and destination input required.\n"
