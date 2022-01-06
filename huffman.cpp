@@ -238,7 +238,8 @@ void Encoding(istream& is, ostream& os)
 	vector<size_t> token_table = MakeTokenTable(is);
 
 	// Æ®¸®
-	PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
+	//PODNodeGuard<HufNode> tree{ MakePrefixTree(token_table) };
+	unique_ptr<HufNode, void(*)(HufNode*)> tree{ MakePrefixTree(token_table), &DestroyPODNodes };
 
 	/*if (!tree)
 		throw exception{ "Cannot build Huffman tree" };*/
