@@ -34,15 +34,19 @@ namespace fs = std::filesystem;
 
 void PrintHelp();
 void PrintSize(const fs::path& src, const fs::path& dst);
-int FillOption(int& option, char* str);
+int FillOption(int& option, char str[]);
 
 int main(int argc, char* argv[])
 try {
 	int options = 0;
 
 	int i;
-	for (i = 1; i < argc && argv[i][0] == '-'; i++)
-		FillOption(options, argv[i] + 1);
+	for (i = 1; i < argc && argv[i][0] == '-'; i++) {
+		int err_code = FillOption(options, argv[i] + 1);
+		if (err_code != EC_GOOD)
+			return err_code;
+	}
+			
 
 	if (options & HELP) {
 		PrintHelp();
@@ -140,7 +144,7 @@ void PrintHelp()
 			"    -e  (encode) Compress the source and save it to the destination.\n"
 			"    -d  (decode) Decompress the source and save it to the destination.\n"
 			"    -s  (size) Print the size of the source file and destination file.\n"
-			"    -r  (delete) Delete source file.\n"
+			"    -r  (remove) Delete source file.\n"
 			"  source:\n"
 			"    Path to the target file to be compressed or decompressed.\n"
 			"    Cannot be the same as the destination\n"
@@ -179,44 +183,39 @@ void PrintSize(const fs::path& src, const fs::path& dst)
 	cout << endl;
 }
 
-int FillOption(int& option, char* str)
+int FillOption(int& option, char str[])
 {
-	switch (*str) {
-	case 'e':
-		if (option & (DECODE | HELP)) {
-			cerr << INVALID_OPTION_COMBINATION;
-			return EC_INVALID_OPTION_COMBINATION;
+	for (; *str; str++) {
+		switch (*str) {
+		case 'e':
+			if (option & (DECODE | HELP)) goto ERROR;
+			option |= ENCODE;
+			break;
+		case 'd':
+			if (option & (ENCODE | HELP)) goto ERROR;
+			option |= DECODE;
+			break;
+		case 'h':
+			if (option & (~HELP))  //& (ENCODE | DECODE | PRINT_SIZE | REMOVE_SOURCE))
+				goto ERROR;
+			option |= HELP;
+			break;
+		case 's':
+			if (option & HELP) goto ERROR;
+			option |= PRINT_SIZE;
+			break;
+		case 'r':
+			if (option & HELP) goto ERROR;
+			option |= REMOVE_SOURCE;
+			break;
+		default:
+			goto ERROR;
 		}
-		option |= ENCODE;
-		return EC_GOOD;
-	case 'd':
-		if (option & (ENCODE | HELP)) {
-			cerr << INVALID_OPTION_COMBINATION;
-			return EC_INVALID_OPTION_COMBINATION;
-		}
-		option |= DECODE;
-		return EC_GOOD;
-	case 'h':
-		if (option & (ENCODE | DECODE | PRINT_SIZE | REMOVE_SOURCE)) {
-			cerr << INVALID_OPTION_COMBINATION;
-			return EC_INVALID_OPTION_COMBINATION;
-		}
-		option |= HELP;
-		return EC_GOOD;
-	case 's':
-		if (option & HELP) {
-			cerr << INVALID_OPTION_COMBINATION;
-			return EC_INVALID_OPTION_COMBINATION;
-		}
-		option |= PRINT_SIZE;
-		return EC_GOOD;
-	case 'r':
-		if (option & HELP) {
-			cerr << INVALID_OPTION_COMBINATION;
-			return EC_INVALID_OPTION_COMBINATION;
-		}
-		option |= REMOVE_SOURCE;
-	default:
-		return EC_INVALID_OPTION_COMBINATION;
 	}
+
+	return EC_GOOD;
+
+ERROR:
+	cerr << INVALID_OPTION_COMBINATION;
+	return EC_INVALID_OPTION_COMBINATION;
 }
