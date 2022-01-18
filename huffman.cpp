@@ -2,18 +2,26 @@
 
 #include <queue>
 #include <stack>
-#include <fstream>
+//#include <fstream>
 #include <memory>
-#include <cstring>
+//#include <cstring>
 
 #define LEFT 0
 #define RIGHT 1
-#define PREV 0
-#define NEXT 1
+//#define PREV 0
+//#define NEXT 1
 
 using namespace std;
 namespace fs = std::filesystem;
 
+//template <typename T>
+//struct greater<T*>
+//{
+//	bool operator()(const T* left, const T* right)
+//	{
+//		return *left > *right;
+//	}
+//};
 
 template <typename T>
 struct ptr_greater
@@ -35,7 +43,7 @@ size_t WritePath(ostream& os, const NameType* str)
 	return (cur - str);
 }
 
-static void BuildCodeTable(const HufNode* tree, int size, bool code[], vector<Code>& code_table);
+static void BuildCodeTable(const HufNode* tree, size_t size, bool code[], vector<Code>& code_table);
 inline void FillTokenTable(istream& is, vector<size_t>& token_table);
 
 // preprocessing for encoding-----------------------------------------------
@@ -47,7 +55,7 @@ inline void FillTokenTable(istream& is, vector<size_t>& token_table)
 
 vector<size_t> MakeTokenTable(istream& is)
 {
-	vector<size_t> token_table(TOKEN_SIZE);
+	vector<size_t> token_table(TOKEN_MAX);
 
 	FillTokenTable(is, token_table);
 
@@ -60,7 +68,7 @@ HufNode* MakePrefixTree(const vector<size_t>& token_table)
 	priority_queue<HufNode*, vector<HufNode*>, ptr_greater<HufNode>> token_queue;
 
 	// 큐 채우기
-	for (int i = 0; i < TOKEN_SIZE; i++) {
+	for (int i = 0; i < TOKEN_MAX; i++) {
 		if (token_table[i] > 0) {
 			TokenCount token_cnt{ i, token_table[i] };
 			token_queue.push(new HufNode{ token_cnt });
@@ -89,15 +97,15 @@ HufNode* MakePrefixTree(const vector<size_t>& token_table)
 
 vector<Code> MakeCodeTable(const HufNode* tree)
 {
-	bool code[TOKEN_SIZE];
-	vector<Code> code_table(TOKEN_SIZE);
+	bool code[TOKEN_MAX];
+	vector<Code> code_table(TOKEN_MAX);
 
 	if (tree) BuildCodeTable(tree, 0, code, code_table);
 
 	return code_table;
 }
 
-static void BuildCodeTable(const HufNode* node, int size, bool code[], vector<Code>& code_table)
+static void BuildCodeTable(const HufNode* node, size_t size, bool code[], vector<Code>& code_table)
 {
 	// 트리의 자식의 개수는 2개이거나 0개이므로 양쪽 다 검사할 필요 없음
 	if (node->link(LEFT)) {
@@ -108,9 +116,9 @@ static void BuildCodeTable(const HufNode* node, int size, bool code[], vector<Co
 		BuildCodeTable(node->link(RIGHT), size + 1, code, code_table);
 	}
 	else {
-		code_table[node->get().token].reserve(size);
 		for (int i = 0; i < size; i++)
-			code_table[node->get().token].push_back(code[i]);
+			code_table[node->get().token].code.set(i, code[i]);
+		code_table[node->get().token].size = size;
 	}
 }
 
@@ -189,9 +197,9 @@ int ConvertToHufCode(istream& is, ostream& os, const vector<Code>& code_table)
 
 	while (is.peek() != EOF) {
 		token_t idx = is.get();
-		for (bool flag : code_table[idx]) {
-			character |= flag << current_bit;
-			if (++current_bit == TOKEN_BITS) {
+		for (int i = 0; i < code_table[idx].size; i++) {
+			character |= code_table[idx].code.test(i) << current_bit;
+			if (++current_bit == TOKEN_BITS) { // 하나씩 하지말고 한번에 하게 바꿀 것
 				os.put(character);
 				current_bit = character = 0;
 			}
@@ -207,7 +215,7 @@ int ConvertToHufCode(istream& is, ostream& os, const vector<Code>& code_table)
 void Encode(istream& is, ostream& os, const vector<Code>& code_table, const HufNode* tree)
 {
 	// 토큰 리코드 빌드
-	TokenRecord token_records[TOKEN_SIZE];
+	TokenRecord token_records[TOKEN_MAX];
 	uint16_t records_size = BuildTokenRecords(tree, token_records);
 
 	// 마지막에 쓰기위한 헤더 공간 확보
@@ -350,10 +358,10 @@ void Decode(istream& is, ostream& os)
 	HufHeader header{};
 	is.read((char*)&header, sizeof(Header));
 
-	if (header.records_size > TOKEN_SIZE)
+	if (header.records_size > TOKEN_MAX)
 		throw out_of_range{ "Invalid file header: Invalid token records size: " + to_string(header.records_size) };
 
-	TokenRecord token_records[TOKEN_SIZE];
+	TokenRecord token_records[TOKEN_MAX];
 	is.read((char*)token_records, sizeof(TokenRecord) * header.records_size);
 	PODNodeGuard<HufNode> tree{ DecodeTokenRecords(token_records, header.records_size) };
 

@@ -3,13 +3,15 @@
 
 #include <stdint.h>
 #include <vector>
-#include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <limits>
+#include <bitset>
+
 #include "node.hpp"
 #include "huf_exception.hpp"
 
-#define TOKEN_SIZE 0x100 // 1byte
+#define TOKEN_MAX 0x100 // 1byte
 #define TOKEN_BITS 8
 
 #define TYPE_REGULAR_FILE 0
@@ -81,7 +83,13 @@ struct TokenRecord
 #pragma pack(pop)
 
 using HufNode = PODNode<TokenCount, 2>;
-using Code = std::vector<bool>;
+//using Code = std::vector<bool>;
+
+struct Code
+{
+	std::bitset<TOKEN_MAX> code;
+	size_t size;
+};
 
 // preprocessing for encoding------------------------------
 std::vector<size_t> MakeTokenTable(std::istream& is);
